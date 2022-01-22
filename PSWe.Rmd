@@ -1,0 +1,700 @@
+---
+title: "Analiza jakości studiowania w PSW (lata 2020--2021) Wydział nauk ekonomicznych"
+author: "PSW"
+date: "01/10/2020"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+library("knitr")
+require("ggplot2")
+require("dplyr")
+library("tidyr")
+library("ggpubr")
+
+knitr::opts_chunk$set(echo = FALSE, warning = F, fig.keep = T, dpi = 300, dev = "png")
+knitr::opts_knit$set(self.contained = FALSE)
+
+## SYSTEM WSZJK-PSW: **Szablon analizy ankiety oceniającej UCZELNIĘ**
+##
+## KONFIGURACJA (wypełnia operator)
+##
+## UWAGI (Wstaw poniżej wszelkie komentarze/uwagi):
+##    Pomijamy kosmetologię (4 studentów)
+## UWAGI_KONIEC
+##
+## Rok akademicki
+rokA <- '2020/2021'
+## Lista kierunków na wydziałach
+we <- c('Ekonomia')
+wz <- c('Pielęgniarstwo', 
+        'Pielęgniarstwo w ramach studiów pomostowych', 'Ratownictwo Medyczne')
+## Bieżący wydział (symbol; jeden z powyższych)
+wb <- we
+## Bieżący wydział (nazwa)
+wb.nazwa <- 'nauk ekonomicznych'
+
+## Nazwy kierunków (z ankiety)
+kier.names <- c('Ratownictwo Medyczne', 'Pielęgniarstwo', 
+                 'Pielęgniarstwo w ramach studiów pomostowych', 'Ekonomia')
+## Odpowiednie skróty kierunków
+kier.labels <- c('RM', 'Piel.', 'Piel.P', 'Eko')
+## Nazwy płci
+sex.names <- c('Mężczyzna', 'Kobieta')
+## Skróty nazw płci
+sex.labels <- c('M', 'K')
+##
+## KONFIGURACJA_KONIEC
+##
+## To co poniżej to raczej już operator nie zmienia
+## Liczba kryterów na ankiecie
+kryteriaN <- 32
+##
+maxScore <- 5 * kryteriaN
+minScore <- 1 * kryteriaN
+
+## Nazwy aspketów
+facet.names <- c( "ocenaProgramu", "ocenaWarunkow", 'ocenaWWW',
+                  "aktywnoscOS", "administracja", "ksztalceniePraktyczne")
+## Skróty aspektów
+facet.labels <- c( "program studiów", "warunki studiowania", "WWW/e-Dziekanat",
+                   "aktywność studencka", "Administracja", "ksztalcenie praktyczne")
+
+## Nazwy kryteriów
+var.names <- c(
+'ofertaPrzedmiotow', 'ofertaSpecjalnosci', 'ofertaPrzemiotowFakultat', 'dostepnoscProgramow', 'dostepnoscRegulaminow', 'ofertaJezyki', 
+'ofertaErasmus', 'ofertWarunkiLokalowe', 'wyposażenieSal', 'bazaKomputerowa', 'liczebnoscGrup', 
+'rozkladZajec', 'biblioteka', 'ksztalceniePraktyczneWymagania', 
+'ksztalceniePraktyczneOrganizacja', 'ksztalceniePraktyczneZbieznosc', 'dziekanatDostep', 'dziekanatZOP', 'dziekanatTK', 
+'edziekanatFunkcjonalnosc', 'edziekanatTerminowosc', 'edziekanatKomentarz', 
+'wwwEstetyka', 'wwwFunkcjonalosc', 'wwwKomentarz', 'kwesturaDostep', 'kwesturaZOP', 'kwesturaTK', 'infopunktDostep', 
+'infopunktZOP', 'infopunktKompetencje', 'UKS', 'SS', 'SKN')
+
+## Skróty kryteriów
+var.labels <- c (
+'Oferta przedmiotów', 'Oferta specjalności', 'Oferta przedmiotów fakultatywnych', 'Dostępność informacji nt programów studiów',
+'Dostępność informacji nt regulaminów', 'Oferta języków obcych', 'Program Erasmus',
+'Warunków lokalowe', 'Wyposażenia sal', 'Baza komputerowa', 'Liczebności grup studenckich',
+'Organizacja rozkładu zajęć', 'Dostęp do wypożyczalni/czytelni', 'Kształcenie praktyczne wymagania',
+'Kształcenie praktyczne organizacja', 'Kształcenie praktyczne zbieżność', 'Dziekanat dostępność',
+'Dziekanat życzliwości/otwartość', 'Dziekanat terminowość', 'e-Dziekanat funkcjonalność',
+'e-Dziekanat terminowość', 'e-Dziekanat uwagi', 'strona WWW estetyka',
+'strona WWW funkcjonalność', 'strona WWW uwagi', 'Kwestura dostępność', 'Kwestura życzliwości/otwartość', 'Kwestura Terminowość',
+'Infopunkt dostępność', 'Infopunkt życzliwości/otwartość', 'Infopunkt kompetencje',
+'Uczelniana Komisja Stypendialna', 'Samorząd Studencki', 'Koła Naukowe')
+
+```
+
+## Wstęp
+
+Do pomiaru jakości nauczania w PSW wykorzystuje się anonimową ankietę
+udostępnianą studentom raz w roku (pod koniec semestru
+letniego) za pomocą uczelnianego systemu e-Dziekanat.
+Formularz ankiety zawiera `r kryteriaN` **indywidualnych wskaźników jakości** oceniających jakość studiowania w PSW wg sześciu aspektów:
+**program/system kształcenia**, **warunki studiowania**,
+**infrastruktura WWW**, **aktwność samorządu studenckiego**,
+**administracja**, oraz **efektywność kształcenia praktycznego**.
+
+Analiza statystyczna ankiet jest wykonywana za pomocą 
+**autorskiego programu WSZJK-PSW** (w języku R)
+stworzonego przez członków zespołu d/s **Zapewnienia Jakości Kształcenia**.
+**Dzięki zautomatyzowaniu przetwarzania danych (w miejsce używania powszechnie do tego
+celu oprogramowania biurowego) udało się znacząco obniżyć
+koszty, zmniejszyć liczbę błędów oraz zapewnić 100% powtarzalność analiz**.
+
+Ten dokument został wygenerowany właśnie w systemie **WSZJK-PSW**.
+
+## Dane
+
+Formularz ankiety zawiera `r kryteriaN` **indywidualnych wskaźników jakości** oceniających jakość studiowania w PSW: 
+
+1. Jak Pan/Pani ocenia ofertę przedmiotów (zakres i treść)
+
+2. Jak Pan/Pani ocenia ofertę specjalności (zakres)
+
+3. Jak Pan/Pani ocenia ofertę przedmiotów fakultatywnych (zakres i treść)
+
+4. Jak Pan/Pani ocenia dostępność i przejrzystości informacji dotyczących programów studiów i spraw dydaktycznych
+
+5. Jak Pan/Pani ocenia dostępność informacji dotyczącej regulaminów (studiów, pomocy materialnej, innych),
+  programów kształcenia, wymagań eg  zaminacyjnych oraz zasad pobierania opłat
+
+6. Jak Pan/Pani ocenia ofertę nauki języków obcych (zakres i stopień zaawansowania)
+
+7. Jak Pan/Pani ocenia ofertę studiów za granicą w ramach programu Erasmus
+
+8. Jak Pan/Pani ocenia ogólne warunków lokalowe
+
+9. Jak Pan/Pani ocenia wyposażenia sal wspomagających proces kształcenia (audiowizualne, tablice itp.)
+
+10. Jak Pan/Pani ocenia  bazę komputerową
+
+11. Jak Pan/Pani ocenia liczebności grup studenckich w aktywnych formach zajęć (ćwiczenia/laboratoria)
+
+12. Jak Pan/Pani ocenia racjonalność i organizację rozkładu zajęć
+
+13. Jak Pan/Pani ocenia dostęp do wypożyczalni/czytelni i dostępnych w niej zbiorów
+
+14. Jak Pan/Pani ocenia  sprecyzowanie wymagań dotyczących wykonywanych zadań i zaliczania umiejętności podczas kształcenia praktycznego 
+
+15. Jak Pan/Pani ocenia organizację kształcenia praktycznego (dobór placówek, kadry)
+
+16. Jak Pan/Pani ocenia zbieżność czynności wykonywanych podczas kształcenia praktycznego
+   z programem wymaganych umiejętności zawodowych  
+
+17. Jak Pan/Pani ocenia dostępność dziekanatu
+
+18. Jak Pan/Pani ocenia życzliwości/otwartość/chęć pomocy pracowników dziekanatu
+
+19. Jak Pan/Pani ocenia pracę dziekanatu pod względem terminowości załatwiania spraw/kompetencji
+
+20. Jak jest Pana/Pani ocenia funkcjonalność e-dziekanatu
+
+21. Jak Pan/Pani ocenia pracę e-dziekanatu pod względem terminowości załatwiania spraw
+
+22. Jak jest Pana/Pani ocena estetyki uczelnianej strony internetowej
+
+23. Jak jest Pana/Pani ocena funkcjonalności uczelnianej strony internetowej oraz  aktualności/kompletności insformacji na tej stronie
+
+24. Jak Pan/Pani ocenia dostępność kwestury
+
+25. Jak Pan/Pani ocenia życzliwości/otwartość/chęć pomocy pracowników kwestury
+
+26. Jak Pan/Pani ocenia pracę kwestury pod względem terminowości załatwiania spraw/kompetencji 
+
+37. Jak Pan/Pani ocenia dostępność punktu informacyjnego 
+
+28. Jak Pan/Pani ocenia życzliwości/otwartość/chęć pomocy pracowników punktu informacyjnego
+
+29. Jak Pan/Pani ocenia pracę punktu informacyjnego pod względem kompetencji
+
+30. Jak Pan/Pani ocenia działalność Uczelnianej Komisji Stypendialnej 
+
+31. Jak Pan/Pani ocenia działalność Samorządu Studenckiego 
+
+32. Jak Pan/Pani ocenia działalność Studenckich Kół Naukowych 
+
+
+Na każde pytanie możliwa było odpowiedź od bardzo źle do bardzo dobrze (zakodowane jako liczby naturalne 1--5)
+
+Powyższe wskaźniki są pogrupowane w 6 następujących **aspektów jakości**: 
+**program/system kształcenia** (1--7);
+**warunki studiowania** (8--13);
+**infrastruktura WWW** (20--23);
+**aktwność samorządu studenckiego** (30--32);
+**administracja** (17--19 oraz 24--29)
+oraz **efektywność kształcenia praktycznego** (14--16).
+
+Ankieta zawiera ponadto następujące dane: 
+
+* datę wypełnienia ankiety;
+
+* nazwę studiowanego kierunku; 
+
+* roku studiów (1,2,3); 
+
+* płeć ankietowanego;
+
+* deklarowaną aktywność w czasie studiów (Brałem udział w aktywności Samorządu Studenckiego/kół naukowych lub imprezach organizowanych przez Samorząd Studencki)
+
+* udział w programie Erasmus (Brałem udział w programie Erasmus).
+
+**Ankieta była wypełniana przez studentów koniec semestru letniego w roku
+akademickim `r rokA`.**
+
+```{r}
+d_0 <- read.csv("Jakosc_Studiowania_w_PSW_2020-2021_lato.csv", 
+              sep = ';', dec = ",",  header=T, na.string="NA") %>%
+  select(!(contains('Komentarz'))) %>%
+  # https://stackoverflow.com/questions/26123516/creating-a-factor-variable-with-dplyr
+  mutate (wydzial = case_when(
+    kierunek %in% we ~ 'e',
+    kierunek %in% wz ~ 'z'
+  ),
+  wydzial = factor(wydzial, levels=c('e', 'z')) ) %>%
+  drop_na(wydzial) %>%
+  mutate (rokStd = case_when(
+    rok < 2 ~ '1',
+    rok > 1 ~ '>1'),
+    rokStd = factor (rokStd, levels=c('1', '>1'))
+    ) %>%
+## Dodajemy Aspekty
+  mutate( ocenaProgramu = ofertaPrzedmiotow + ofertaSpecjalnosci + 
+                  ofertaPrzemiotowFakultat +
+                  dostepnoscProgramow + dostepnoscRegulaminow + ofertaJezyki + 
+                  ofertaErasmus,
+          ocenaWarunkow = ofertWarunkiLokalowe + wyposażenieSal + bazaKomputerowa + 
+                             liczebnoscGrup + rozkladZajec + biblioteka,
+          ocenaWWW = wwwEstetyka + wwwFunkcjonalosc + edziekanatFunkcjonalnosc + 
+                        edziekanatTerminowosc,
+          aktywnoscOS = UKS + SS + SKN, 
+          administracja = dziekanatDostep + dziekanatZOP + dziekanatTK +
+                             kwesturaDostep + kwesturaZOP + kwesturaTK + infopunktDostep +
+                             infopunktZOP + infopunktKompetencje, 
+          ksztalceniePraktyczne = ksztalceniePraktyczneWymagania +
+                                     ksztalceniePraktyczneOrganizacja + 
+                                     ksztalceniePraktyczneZbieznosc,
+          Razem = ocenaProgramu + ocenaWarunkow + ocenaWWW +
+            aktywnoscOS + administracja + ksztalceniePraktyczne,
+          ## teraz średnie (zamiast sum)
+          ocenaProgramu = ocenaProgramu / 7,
+          ocenaWarunkow = ocenaWarunkow / 6,
+          ocenaWWW = ocenaWWW / 4,
+          aktywnoscOS = aktywnoscOS /3,
+          administracja = administracja  / 9,
+          ksztalceniePraktyczne = ksztalceniePraktyczne / 3
+)
+
+## liczba ankiet
+dNr <- nrow(d_0)
+```
+
+**W roku akademickim `r rokA` wypełniono `r dNr` ankiet**.
+
+
+## Analiza rzetelności
+
+Zgrubnie oceniamy na ile studentom się chciało rzetelnie wypełnić ankietę.
+Za kryterium **nierzetelności** przyjmujemy wskazanie przez
+ankietowanego wyłącznie maksymalnych/minimalnych ocen dla wszystkich kryteriów,
+(dopuszczając, że w jednym przypadku tenże ankietowany wpisał ocenę o jeden stopień mniejszą/większą.) Innymi słowy podejrzane są ankiety z wynikiem łącznej oceny
+różnej wartości maksymalnej minus 1 i większej lub równej
+wartości minimalnej plus 1 i mniejszej (konkretnie jest to
+`r maxScore -1` lub więcej lub `r minScore +1` lub mniej):
+
+
+```{r, echo=FALSE}
+p0r <- ggplot(d_0, aes(x=as.factor(wydzial), y=Razem, fill=as.factor(wydzial))) + 
+  geom_boxplot() + ylab("") + xlab("") + ggtitle("") + 
+  theme(legend.position="none")
+
+p0r
+```
+
+Jak widać na wykresie pudełkowym typowy obszar zmienności zawiera 
+maksymalną wartość łącznej oceny. 
+
+
+```{r, echo=FALSE}
+#summary(d_0$Razem)
+ocenaMax <- d_0 %>% filter (Razem >= maxScore - 1 | Razem <= minScore +1 )
+ankiety.na.pale <- nrow(ocenaMax)
+```
+
+Ankiet, w których maksymalną wartość łącznej oceny jest nie mniejsza niż `r maxScore -1` lub nie większa niż `r minScore +1`,  jest `r  ankiety.na.pale `. Usuwamy je. 
+
+```{r, echo=F}
+## jako nierzetelne usuwamy
+d_0 <- d_0 %>% filter (Razem < maxScore - 1 & Razem > minScore +1 )
+dN <- nrow(d_0)
+```
+
+Ostatecznie zatem analizujemy `r dN` ankiet (co stanowi `r dN/dNr * 100`% 
+wszystkich wypełnionych.) 
+
+**UWAGA**: pominięcie ankiet 
+powoduje zaniżenie ocen -- ale wszystkich o tyle samo.
+
+Podstawowe informacje o ankietowanych zawierają poniższe 
+wykresy (`r kier.labels` to odpowiednio `r kier.names`):
+
+```{r, echo=FALSE}
+dN.rok <- d_0 %>% group_by(rok) %>% 
+  summarise(n = n())
+
+#kable(dN.rok, col.names = c('Rok studiów', 'liczba studentów'))
+q1x <- ggplot(dN.rok, aes(x = rok, y = n )) +
+  ggtitle('Studenci wg lat studiów') +
+  theme(plot.title = element_text(size=8)) +
+  xlab("") + ylab("") +
+  geom_bar(position = 'dodge', stat = 'identity', fill = "darkseagreen3") +
+  geom_text(aes(label=sprintf("%i", n) ), hjust=1.5, color="firebrick4", size=3 ) +
+  coord_flip()
+
+dN.kierunek <- d_0 %>% group_by(kierunek) %>% 
+  summarise(n = n())
+#kable(dN.kierunek, col.names = c('Kierunek', 'liczba studentów'))
+q2x <- ggplot(dN.kierunek, aes(x = kierunek, y = n )) +
+  ggtitle('Studenci wg kierunku studiów') +
+  theme(plot.title = element_text(size=8)) +
+  xlab("") + ylab("") +
+  geom_bar(position = 'dodge', stat = 'identity', fill = "darkseagreen3") +
+  geom_text(aes(label=sprintf("%i", n) ), hjust=1.5, color="firebrick4", size=3 ) +
+  scale_x_discrete (breaks=kier.names,  labels=kier.labels) +
+  coord_flip()
+
+dN.wydzial <- d_0 %>% group_by(wydzial) %>%   summarise(n = n())
+#kable(dN.wydzial, col.names = c('Wydział', 'liczba studentów'))
+
+q3x <- ggplot(dN.wydzial, aes(x = wydzial, y = n )) +
+  ggtitle('Studenci wg wydziałów') +
+  theme(plot.title = element_text(size=8)) +
+  xlab("") + ylab("") +
+  geom_bar(position = 'dodge', stat = 'identity', fill = "darkseagreen3") +
+  geom_text(aes(label=sprintf("%i", n) ), hjust=1.5, color="firebrick4", size=3 ) +
+  coord_flip()
+
+dN.plec <- d_0 %>% group_by(plec2) %>%   summarise(n = n())
+#kable(dN.plec, col.names = c('Płeć', 'liczba studentów'))
+q4x <- ggplot(dN.plec, aes(x = plec2, y = n )) +
+  ggtitle('Studenci wg płci') +
+  theme(plot.title = element_text(size=8)) +
+  xlab("") + ylab("") +
+  geom_bar(position = 'dodge', stat = 'identity', fill = "darkseagreen3") +
+  geom_text(aes(label=sprintf("%i", n) ), hjust=1.5, color="firebrick4", size=3 ) +
+  scale_x_discrete (breaks=sex.names,  labels=sex.labels) +
+  coord_flip()
+
+dN.aktywnosc <- d_0 %>% group_by(aktywnosc) %>%   summarise(n = n())
+#kable(dN.aktywnosc, col.names = c('Aktywność w czasie studiów', 'liczba studentów'))
+
+q5x <- ggplot(dN.aktywnosc, aes(x = aktywnosc, y = n )) +
+  ggtitle('Studenci wg aktywności w czasie studiów') +
+  theme(plot.title = element_text(size=8)) +
+  xlab("") + ylab("") +
+  geom_bar(position = 'dodge', stat = 'identity', fill = "darkseagreen3") +
+  geom_text(aes(label=sprintf("%i", n) ), hjust=1.5, color="firebrick4", size=3 ) +
+  coord_flip()
+
+dN.aktywnoscErasmus <- d_0 %>% group_by(aktywnoscErasmus) %>%  summarise(n = n())
+
+#kable(dN.aktywnoscErasmus, col.names = c('Udział w programie Erasmus', 
+#                                         'liczba studentów'))
+
+q6x <- ggplot(dN.aktywnoscErasmus, aes(x = aktywnoscErasmus, y = n )) +
+  ggtitle('Studenci wg udziału w Erasmus') +
+  theme(plot.title = element_text(size=8)) +
+  xlab("") + ylab("") +
+  geom_bar(position = 'dodge', stat = 'identity', fill = "darkseagreen3") +
+  geom_text(aes(label=sprintf("%i", n) ), hjust=1.5, color="firebrick4", size=3 ) +
+  coord_flip()
+
+q11x <- ggarrange(q1x, q2x, q3x, q4x, q5x, q6x, ncol=2, nrow=3)
+q11x
+```
+
+++ewentualny komentarz++
+
+## Wydział `r wb.nazwa`
+
+Podstawowe informacje o ankietowanych zawierają 
+poniższe wykresy (`r kier.labels` to odpowiednio `r kier.names`):
+
+```{r, echo=F}
+d_0_b <- d_0 %>% filter (kierunek %in% wb )
+
+dN.b <- nrow(d_0_b)
+
+dN.rok.b <- d_0_b %>% group_by(rok) %>% summarise(n = n())
+
+q1x <- ggplot(dN.rok.b, aes(x = rok, y = n )) +
+  ggtitle('Studenci wg lat studiów') +
+  theme(plot.title = element_text(size=8)) +
+  xlab("") + ylab("%") +
+  geom_bar(position = 'dodge', stat = 'identity', fill = "lightpink3") +
+  geom_text(aes(label=sprintf("%i", n) ), hjust=1.5, color="hotpink4", size=3 ) +
+  coord_flip()
+
+dN.kierunek.b <- d_0_b %>% group_by(kierunek) %>% summarise(n = n())
+
+q2x <- ggplot(dN.kierunek.b, aes(x = kierunek, y = n )) +
+  ggtitle('Studenci wg kierunków studiów') +
+  theme(plot.title = element_text(size=8)) +
+  xlab("") + ylab("%") +
+  geom_bar(position = 'dodge', stat = 'identity', fill = "lightpink3") +
+  geom_text(aes(label=sprintf("%i", n) ), hjust=1.5, color="hotpink4", size=3 ) +
+  scale_x_discrete (breaks=kier.names,  labels=kier.labels) +
+  coord_flip()
+
+dN.plec.b <- d_0_b %>% group_by(plec2) %>%  summarise(n = n())
+
+q3x <- ggplot(dN.plec.b, aes(x = plec2, y = n )) +
+  ggtitle('Studenci wg płci') +
+  theme(plot.title = element_text(size=8)) +
+  xlab("") + ylab("%") +
+  geom_bar(position = 'dodge', stat = 'identity', fill = "lightpink3") +
+  geom_text(aes(label=sprintf("%i", n) ), hjust=1.5, color="hotpink4", size=3 ) +
+  scale_x_discrete (breaks=sex.names,  labels=sex.labels) +
+  coord_flip()
+
+dN.aktywnosc.b <- d_0_b %>% group_by(aktywnosc) %>%  summarise(n = n())
+#kable(dN.aktywnosc, col.names = c('Aktywność w czasie studiów', 'liczba studentów'))
+q4x <- ggplot(dN.aktywnosc.b, aes(x = aktywnosc, y = n )) +
+  ggtitle('Studenci wg aktywności w czasie studiów') +
+  theme(plot.title = element_text(size=8)) +
+  xlab("") + ylab("%") +
+  geom_bar(position = 'dodge', stat = 'identity', fill = "lightpink3") +
+  geom_text(aes(label=sprintf("%i", n) ), hjust=1.5, color="hotpink4", size=3 ) +
+  coord_flip()
+
+
+dN.aktywnoscErasmus.b <- d_0_b %>% group_by(aktywnoscErasmus) %>% 
+  filter (aktywnoscErasmus == 'Tak')
+dN.aktywnoscErasmus.b.t <- nrow(dN.aktywnoscErasmus.b)
+#kable(dN.aktywnoscErasmus, col.names = c('Udział w programie Erasmus', 
+#'liczba studentów'))
+
+q22x <- ggarrange(q1x, q2x, q3x, q4x, ncol=2, nrow=2)
+q22x
+
+```
+
+++Ewentualny komentarz++
+
+Ponadto `r dN.aktywnoscErasmus.b.t` studentów wydziału uczestniczących
+w badaniu deklaruje aktywny udział w programie Erasmus.
+Łączna liczba ankietowanych na wydziale `r wb.nazwa` wyniosła `r dN.b`.
+
+Dwa kolejne wykresy przedstawiają **zbiorcze wartości 
+indywidualnych wskaźników jakości**.
+Pierwszy wykres przedstawia odsetek ocen najwyższych (**bardzo dobrze**); 
+drugi wykres to odsetek ocen najgorszych (**źle i bardzo źle**):
+
+
+```{r, echo=F}
+## Indywidulne kryteria (bieżący wydział)
+k.b <- d_0 %>% filter (kierunek %in% wb ) %>%
+  pivot_longer(cols=(ofertaPrzedmiotow:SKN), names_to = 'kryterium', values_to = 'ocena');
+
+## Aspekty (bieżący wydział)
+a <- d_0 %>% filter (kierunek %in% wb ) %>%
+  pivot_longer(cols=(ocenaProgramu:ksztalceniePraktyczne), 
+               names_to = 'kryterium', values_to = 'ocena')
+
+f <- k.b %>% mutate(cat = factor(kryterium)) %>%
+  group_by (cat) %>%
+  summarise( 
+    mm = mean(ocena, na.rm=TRUE), 
+    qq=sum(ocena == 5) / n() * 100,
+    zz=sum(ocena < 3) / n() * 100,
+    nn = n()) %>%
+  ungroup()
+
+fa <- a %>% mutate(cat = factor(kryterium)) %>%
+  group_by (cat) %>%
+  summarise( mm = mean(ocena, na.rm=TRUE), 
+             nn = n()) %>%
+  ungroup()
+
+
+p1b <- ggplot(f, aes(x = reorder(cat,qq), y = qq )) +
+  ggtitle('Odsetek ocen b.dobrze') +
+  xlab("") + ylab("%") +
+  geom_bar(position = 'dodge', stat = 'identity', fill = "steelblue") +
+  geom_text(aes(label=sprintf("%.2f", qq) ), hjust=1.5, color="white", size=2.5 ) +
+  scale_x_discrete (breaks=var.names,  labels=var.labels) +
+  coord_flip()
+p1b
+```
+
+++Ewentualny komentarz++
+
+```{r}
+p2b <- ggplot(f, aes(x = reorder(cat,zz), y = zz )) +
+  ggtitle('Odsetek ocen źle/bardzo źle') +
+  xlab("") + ylab("%") +
+  geom_bar(position = 'dodge', stat = 'identity', fill = "hotpink4") +
+  geom_text(aes(label=sprintf("%.2f", zz) ), hjust=1.5, color="white", size=2.5 ) +
+  scale_x_discrete (breaks=var.names,  labels=var.labels) +
+  coord_flip()
+p2b
+```
+
+++Ewentualny komentarz++
+
+Ocenę zbiorczą według sześciu wyróźnionych **akspektów jakości**
+przedstawiono na kolejnym wykresie:
+
+```{r}
+p3b <- ggplot(fa, aes(x = reorder(cat,mm), y = mm )) +
+  ggtitle('Aspekty jakości studiowania w PSW', 
+          subtitle='średnie arytmetyczne ocen indywidualnych') +
+  xlab("") + ylab("") +
+  geom_bar(position = 'dodge', stat = 'identity', fill = "steelblue") +
+  geom_text(aes(label=sprintf("%.2f", mm) ), hjust=1.5, color="white" ) +
+  scale_x_discrete (breaks=facet.names,  labels=facet.labels) +
+  coord_flip()
+p3b
+```
+
+
+++Ewentualny komentarz++
+
+Zróżnicowanie ocen wg roku studiów ankietowanego (w podziale na **pierwszy rok** oraz
+**drugi i trzeci łącznie**) przedstawia kolejny wykres:
+
+```{r, message=F}
+f.r <- k.b %>% mutate(cat = factor(kryterium)) %>%
+  group_by (cat, rokStd) %>%
+  summarise( 
+    mm = mean(ocena, na.rm=TRUE), 
+    qq=sum(ocena == 5) / n() * 100,
+    zz=sum(ocena < 3) / n() * 100,
+    nn = n()) %>%
+  ungroup()
+
+p1r <- ggplot(f.r, aes(x = reorder(cat,qq), y = qq, color=rokStd )) +
+  ggtitle('Odsetek ocen b.dobrze') +
+  xlab("") + ylab("%") +
+  geom_point() +
+  ##geom_text(aes(label=sprintf("%.2f", qq) ), hjust=1.5, color="white" ) +
+  scale_x_discrete (breaks=var.names,  labels=var.labels) +
+  coord_flip()
+p1r
+```
+
+++Ewentualny komentarz++
+
+## Porówanie międzywydziałowe
+
+Dwa kolejne wykresy przedstawiają **zbiorcze wartości** (dla obu wydziałów łącznie)
+**indywidualnych wskaźników jakości**.
+Pierwszy wykres przedstawia 
+odsetek ocen najwyższych (**bardzo dobrze**); drugi wykres to odsetek ocen najgorszych (**źle i bardzo źle**):
+
+
+```{r, message=F}
+k <- d_0 %>%
+  pivot_longer(cols=(ofertaPrzedmiotow:SKN), names_to = 'kryterium', values_to = 'ocena');
+
+a <- d_0 %>%
+  pivot_longer(cols=(ocenaProgramu:ksztalceniePraktyczne), 
+               names_to = 'kryterium', values_to = 'ocena')
+
+
+f <- k %>% mutate(cat = factor(kryterium)) %>%
+  group_by (cat) %>%
+  summarise( 
+    mm = mean(ocena, na.rm=TRUE), 
+    qq=sum(ocena == 5) / n() * 100,
+             zz=sum(ocena < 3) / n() * 100,
+             nn = n()) %>%
+  ungroup()
+
+fa <- a %>% mutate(cat = factor(kryterium)) %>%
+  group_by (cat) %>%
+  summarise( mm = mean(ocena, na.rm=TRUE), 
+             nn = n()) %>%
+  ungroup()
+
+
+p1 <- ggplot(f, aes(x = reorder(cat,qq), y = qq )) +
+  ggtitle('Odsetek ocen b.dobrze') +
+  xlab("") + ylab("%") +
+  geom_bar(position = 'dodge', stat = 'identity', fill = "steelblue") +
+  geom_text(aes(label=sprintf("%.2f", qq) ), hjust=1.5, color="white", size=2.5 ) +
+  scale_x_discrete (breaks=var.names,  labels=var.labels) +
+  coord_flip()
+p1
+```
+
+++Ewentualny komentarz++
+
+```{r}
+p2 <- ggplot(f, aes(x = reorder(cat,zz), y = zz )) +
+  ggtitle('Odsetek ocen źle/bardzo źle') +
+  xlab("") + ylab("%") +
+  geom_bar(position = 'dodge', stat = 'identity', fill = "hotpink4") +
+  geom_text(aes(label=sprintf("%.2f", zz) ), hjust=1.5, color="white", size=2.5 ) +
+  scale_x_discrete (breaks=var.names,  labels=var.labels) +
+  coord_flip()
+p2
+```
+
+++Ewentualny komentarz++
+
+Ocenę zbiorczą (dla obu wydziałów łącznie) według sześciu 
+wyróżnionych **akspektów jakości**
+przedstawiono na kolejnym wykresie:
+
+```{r}
+p3 <- ggplot(fa, aes(x = reorder(cat,mm), y = mm )) +
+  ggtitle('Aspekty jakości studiowania w PSW', 
+          subtitle='średnie arytmetyczne ocen indywidualnych') +
+  xlab("") + ylab("") +
+  geom_bar(position = 'dodge', stat = 'identity', fill = "steelblue") +
+  geom_text(aes(label=sprintf("%.2f", mm) ), hjust=1.5, color="white" ) +
+  scale_x_discrete (breaks=facet.names,  labels=facet.labels) +
+  coord_flip()
+p3
+```
+
+
+++Ewentualny komentarz++
+
+Zróżnicowanie ocen wg **wydziału**, na którym studiuje ankietowany 
+przedstawia kolejny wykres:
+
+
+```{r, message=F}
+f.w <- k %>% mutate(cat = factor(kryterium)) %>%
+  group_by (cat, wydzial) %>%
+  summarise( 
+    mm = mean(ocena, na.rm=TRUE), 
+    qq=sum(ocena == 5) / n() * 100,
+    zz=sum(ocena < 3) / n() * 100,
+    nn = n()) %>%
+  ungroup()
+
+p1w <- ggplot(f.w, aes(x = reorder(cat,qq), y = qq, color=wydzial )) +
+  ggtitle('Odsetek ocen b.dobrze') +
+  xlab("") + ylab("%") +
+  geom_point() +
+  ##geom_text(aes(label=sprintf("%.2f", qq) ), hjust=1.5, color="white" ) +
+  scale_x_discrete (breaks=var.names,  labels=var.labels) +
+  coord_flip()
+p1w
+```
+
+++Ewentualny komentarz++
+
+Zróżnicowanie ocen wg roku studiów ankietowanego (w podziale na **pierwszy rok** oraz
+**drugi i trzeci łącznie**) przedstawia kolejny wykres:
+
+```{r, message=F}
+f.r <- k %>% mutate(cat = factor(kryterium)) %>%
+  group_by (cat, rokStd) %>%
+  summarise( 
+    mm = mean(ocena, na.rm=TRUE), 
+    qq=sum(ocena == 5) / n() * 100,
+    zz=sum(ocena < 3) / n() * 100,
+    nn = n()) %>%
+  ungroup()
+
+p1r <- ggplot(f.r, aes(x = reorder(cat,qq), y = qq, color=rokStd )) +
+  ggtitle('Odsetek ocen b.dobrze') +
+  xlab("") + ylab("%") +
+  geom_point() +
+  ##geom_text(aes(label=sprintf("%.2f", qq) ), hjust=1.5, color="white" ) +
+  scale_x_discrete (breaks=var.names,  labels=var.labels) +
+  coord_flip()
+p1r
+```
+
+++Ewentualny komentarz++
+
+Ostatni wykres przedstawia zróżnicowanie ocen wg **płci** ankietowanego:
+
+
+```{r, message=F}
+f.p <- k %>% mutate(cat = factor(kryterium)) %>%
+  group_by (cat, plec2) %>%
+  summarise( 
+    mm = mean(ocena, na.rm=TRUE), 
+    qq=sum(ocena == 5) / n() * 100,
+    zz=sum(ocena < 3) / n() * 100,
+    nn = n()) %>%
+  ungroup()
+
+p1p <- ggplot(f.p, aes(x = reorder(cat,qq), y = qq, color=plec2 )) +
+  ggtitle('Odsetek ocen b.dobrze') +
+  xlab("") + ylab("%") +
+  geom_point() +
+  scale_x_discrete (breaks=var.names,  labels=var.labels) +
+  coord_flip()
+p1p
+```
+
+++Ewentualny komentarz++
