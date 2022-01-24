@@ -1,0 +1,589 @@
+---
+title: "Analiza losów absolwentów PSW (2021)"
+subtitle: Wydział Nauk o Zdrowiu
+author: zespół d/s ZJK
+date: "01/12/2021"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE, echo=F}
+knitr::opts_chunk$set(echo = F, warning=F, message=F)
+require("ggplot2")
+require("dplyr")
+library("tidyr")
+library("stringr")
+library("knitr")
+
+pic.width <- 10
+pic.narrow <- 4
+
+pytania <- c("data.skip",
+  "plec","rok","tryb","wiek",
+  "kierunek",
+  "sektor",
+  "dziedzina",
+  "typ.zatrudnienia",
+  "satysfakcja",
+  "wynagrodzenie",
+  "u1",
+  "u2",
+  "u3",
+  "u4",
+  "u5",
+  "u6",
+  ##
+  "program.studiow",
+  ##
+  "zamiary.d.ksztalcenia",
+  "motywy.d.ksztalcenia",
+  ##
+  "oczekiwania",
+  "decyzja.jeszcze.raz",
+  "uwagi",
+  "pytanie.skip")
+satisf.breaks <- c("bardzo niezadowolony","niezadowolony", "trudno powiedzieć",
+                   "zadowolony", "bardzo zadowolony")
+satisf.labels <- c("-n","n", "±", "z", "z+")
+useful.breaks <- c("całkowicie się nie przydają","nie przydają", "trudno powiedzieć",
+                   "przydają", "bardzo przydają")
+useful.labels <- c("-n","n", "±", "p", "p+")
+agree.breaks <- c("zdecydowanie nie", "nie", "trudno powiedzieć", "tak", "zdecydowanie tak")
+agree.labels <- c("-n","n", "±", "p", "p+")
+
+```
+
+## Opis procedury zbierania i analizy danych
+
+Informacje nt losów absolwentów PSW są pozyskiwane za pomocą anonimowej ankiety 
+udostępnianej absolwentom w postaci **formularza internetowego**.
+
+Ankieta zawiera 21 pytań dotyczących absolwenta (płeć/wiek/kierunek studiów które ukończył); pracy którą  wykonuje w chwili obecnej (pytania 7--10);
+postrzeganej przydatności w wykonywanym
+przez nich
+zawodzie różnych nabytych w czasie studiów umiejętności (pytania 11--16)
+całościowej oceny szkoły, decyzji odnośnie wybranego kierunku
+oraz planów dalszej edukacji (pytania 17--21). Uwaga: formularz ankiety został
+zmieniony/zmodyfikowany w roku 2021 a co za tym idzie 
+badanie absolwentów w roku 2021 jest pierwszym badaniem
+wykorzystującym nowy kwestionariusz.
+
+Osoby niepracujące nie są pytanie (z oczywistych względów) o wykonywaną pracę
+i przydatność w tej pracy nabytych w czasie studiów umiejętności. W tym aspekcie
+analizowane są tylko odpowiedzi od osób pracujących. **Uwaga**:  ponieważ liczba ankiet 
+wypełnionych przez osoby które zadeklarowały że obecnie **nie pracują** była 
+bardzo niska (kilka osób); nie analizowano *ilościowo* tej grupy absolwentów. 
+
+
+**Kompletny formularz ankiety zamieszono na końcu niniejszego opracowania.**
+
+Analiza statystyczna ankiet jest wykonywana za pomocą
+**autorskiego programu WSZJK-PSW** (w języku R)
+stworzonego przez członków zespołu d/s **Zapewnienia Jakości Kształcenia**.
+**Dzięki zautomatyzowaniu przetwarzania danych (w miejsce używania powszechnie do tego
+celu oprogramowania biurowego) udało się znacząco obniżyć
+koszty, zmniejszyć liczbę błędów oraz zapewnić 100% powtarzalność analiz**.
+
+Ten dokument został wygenerowany właśnie w systemie **WSZJK-PSW**.
+
+Raporty niniejszy opisuje badanie wykonane bezpośrednio po ukończeniu studiów.
+
+
+```{r}
+d00 <- read.csv("AAP.csv", sep = ',', dec = ".",  
+                header=F, skip=1,
+                col.names = pytania,
+                na.string="NA");
+
+d <- d00  %>%
+  mutate (program.studiow=recode(program.studiow,
+                               'bardzo przydają' = 'zdecydowanie tak',
+                               'przydają' = 'tak',
+                               'nie przydają' = 'nie',
+                               'całkowicie się nie przydają' = 'zdecydowanie nie')) %>%
+  ######
+  mutate(
+    studia.mgr =case_when(
+      str_detect(zamiary.d.ksztalcenia, "tak, na studiach magisterskich") ~ 1, 
+      TRUE ~ 0),
+    studia.pdpl =case_when(
+      str_detect(zamiary.d.ksztalcenia, "tak, na studiach podyplomowych") ~ 1, 
+      TRUE ~ 0),
+    studia.inne =case_when(
+        str_detect(zamiary.d.ksztalcenia, "MBA") ~ 1, 
+      TRUE ~ 0),
+    inna.forma =case_when(
+          str_detect(zamiary.d.ksztalcenia, "w innej formie") ~ 1, 
+          TRUE ~ 0),
+    nie.planuje =case_when(
+            str_detect(zamiary.d.ksztalcenia, "nie planuję") ~ 1, 
+            TRUE ~ 0)) %>%
+  mutate(
+    ZZS =case_when(
+      str_detect(motywy.d.ksztalcenia, "zwiększenie szansy znalezienia") ~ 1, 
+      TRUE ~ 0),
+    WK =case_when(
+      str_detect(motywy.d.ksztalcenia, "wykonywaną pracą") ~ 1, 
+      TRUE ~ 0),
+    WKZP =case_when(
+      str_detect(motywy.d.ksztalcenia, "zmiany pracy") ~ 1, 
+      TRUE ~ 0),
+    RZ =case_when(
+      str_detect(motywy.d.ksztalcenia, "rozwoju zawodowego") ~ 1, 
+      TRUE ~ 0),
+    SM =case_when(
+      str_detect(motywy.d.ksztalcenia, "statusu materialnego") ~ 1, 
+      TRUE ~ 0),
+    RO =case_when(
+      str_detect(motywy.d.ksztalcenia, "rozwój osobisty") ~ 1, 
+      TRUE ~ 0),
+    OPP =case_when(
+      str_detect(motywy.d.ksztalcenia, "oddelegowanie") ~ 1, 
+      TRUE ~ 0)
+    ) 
+
+nrd <- nrow(d)
+```
+
+W ankiecie wzięło udział (pracujących) `r nrd` absolwentów. Poniższe zestawienie
+przedstawia rozkład absolwentów ze względu na kierunki, na których studiowali:
+
+```{r}
+d_by_k <- d %>% group_by(kierunek) %>%   summarise(n = n())
+kable(d_by_k, col.names = c('Kierunek', 'liczba studentów'))
+```
+
+
+## Podstawowe informacje o ankietowanych absolwentach
+
+Struktura według płci, sektora w których pracują, typu zatrudnienia
+
+```{r}
+## https://sebastiansauer.github.io/percentage_plot_ggplot2_V2/
+p.plec <- ggplot(d, aes(x= as.factor(plec),  group=kierunek)) + 
+    geom_bar(aes(y = ..prop.., fill = factor(..x..)), stat="count") +
+    geom_text(aes( label = scales::percent(..prop..),
+                   y= ..prop.. ), stat= "count", vjust = -.5) +
+    labs(y = "%", fill="płeć", x="kierunek") +
+    facet_grid(~kierunek) +
+    scale_x_discrete(breaks=c('M', 'K'), labels=c('M', 'K')) +
+    theme(legend.position = "none") +
+    ggtitle("Pytanie 1: Płeć") +
+    scale_y_continuous(labels = scales::percent)
+p.plec
+```
+
+
+```{r}
+##3. sektor;
+########
+p.sektor <- ggplot(d, aes(x= as.factor(sektor),  group=kierunek)) + 
+    geom_bar(aes(y = ..prop.., fill = factor(..x..)), stat="count") +
+    geom_text(aes( label = scales::percent(..prop..),
+                   y= ..prop.. ), stat= "count", vjust = -.5) +
+    labs(y = "%", fill="Sektor", x='Sektor') +
+    facet_grid(~kierunek) +
+    ggtitle("Pytanie 7: W jakim sektorze gospodarki Pan/i pracuje?") +
+    theme(legend.position = "none") +
+    #scale_x_discrete(breaks=c('0', '1'), labels=c('prywatny', 'publiczny')) +
+    scale_y_continuous(labels = scales::percent)
+p.sektor
+```
+
+```{r, fig.width=pic.width, fig.height= pic.narrow  }
+##4 okresp;
+#######
+p.okresp <- ggplot(d, aes(x= as.factor(typ.zatrudnienia),  group=kierunek)) + 
+    geom_bar(aes(y = ..prop.., fill = factor(..x..)), stat="count") +
+    geom_text(aes( label = scales::percent(..prop..),
+                   y= ..prop.. ), stat= "count", vjust = -.5) +
+    labs(y = "Percent", fill="!!!", x='OkresP') +
+    facet_grid(~kierunek) +
+    #scale_x_discrete(breaks=c('1', '2', '3'), labels=c('<8m', '8m/3l',  'cn')) +
+    theme(legend.position = "none") +
+    #ggtitle("Na jaki okres jest Pan/i zatrudniony/a?") +
+    ggtitle("Pytanie 8: Jaki jest typ Pana/i zatrudnienia?") +
+    scale_y_continuous(labels = scales::percent) +
+    coord_flip()
+
+p.okresp
+```
+
+## Satysfakcja zawodowa
+
+Pytania 9--10 oceniały satysfakcję z wykonywanej obecnie pracy
+w aspekcie ogólnym oraz finansowym
+
+```{r, fig.width=pic.width, fig.height= pic.narrow  }
+##5 zadowolony;  ################
+p.sat <- ggplot(d, aes(x= as.factor(satysfakcja),  group=kierunek)) + 
+    geom_bar(aes(y = ..prop.., fill = factor(..x..)), stat="count") +
+    geom_text(aes( label = scales::percent(..prop..),
+                   y= ..prop.. ), stat= "count", vjust = -.5) +
+    labs(y = "Percent", fill="Z", x='Z') +
+    facet_grid(~kierunek) +
+    theme(legend.position = "none") +
+    ggtitle("Pytanie 9: Czy jest Pan/i zadowolony/a ze swojej pracy") +
+    scale_x_discrete(breaks=satisf.breaks, labels=satisf.labels) +
+    scale_y_continuous(labels = scales::percent) +
+    coord_flip()
+
+p.sat
+```
+
+
+```{r, fig.width=pic.width, fig.height= pic.narrow }
+p.sat.z <- ggplot(d, aes(x= as.factor(wynagrodzenie),  group=kierunek)) + 
+  geom_bar(aes(y = ..prop.., fill = factor(..x..)), stat="count") +
+  geom_text(aes( label = scales::percent(..prop..),
+                 y= ..prop.. ), stat= "count", vjust = -.5) +
+  labs(y = "%", fill="Z", x='Z') +
+  facet_grid(~kierunek) +
+  theme(legend.position = "none") +
+  ggtitle("Pytanie 10: Czy jest Pan/i zadowolony/a z wynagrodzenia") +
+  scale_x_discrete(breaks=satisf.breaks, labels=satisf.labels) +
+  scale_y_continuous(labels = scales::percent) +
+  coord_flip()
+
+p.sat.z
+```
+
+### Ocena umiejętności nabytych w czasie studiowania
+
+Pytania 11--16 dotyczyły postrzeganej przez ankietowanych przydatności w wykonywanym
+przez nich
+zawodzie różnych nabytych w czasie studiów umiejętności
+
+
+```{r, fig.width=pic.width, fig.height= pic.narrow }
+
+p.sat.u1 <- ggplot(d, aes(x= as.factor(u1),  group=kierunek)) + 
+  geom_bar(aes(y = ..prop.., fill = factor(..x..)), stat="count") +
+  geom_text(aes( label = scales::percent(..prop..),
+                 y= ..prop.. ), stat= "count", vjust = -.5) +
+  labs(y = "%", fill="Z", x='Z') +
+  facet_grid(~kierunek) +
+  theme(legend.position = "none") +
+  ggtitle("Pytanie 11: przydatność umiejętności specjalistycznych (U1)") +
+  scale_x_discrete(breaks=useful.breaks, labels=useful.labels) +
+  scale_y_continuous(labels = scales::percent) +
+  coord_flip()
+
+p.sat.u1
+```
+
+```{r, fig.width=pic.width, fig.height= pic.narrow }
+p.sat.u2 <- ggplot(d, aes(x= as.factor(u2),  group=kierunek)) + 
+  geom_bar(aes(y = ..prop.., fill = factor(..x..)), stat="count") +
+  geom_text(aes( label = scales::percent(..prop..),
+                 y= ..prop.. ), stat= "count", vjust = -.5) +
+  labs(y = "%", fill="Z", x='Z') +
+  facet_grid(~kierunek) +
+  theme(legend.position = "none") +
+  ggtitle("Pytanie 12: przydatność języków obcych (U2)") +
+  scale_x_discrete(breaks=useful.breaks, labels=useful.labels) +
+  scale_y_continuous(labels = scales::percent) +
+  coord_flip()
+
+p.sat.u2
+```
+
+```{r, fig.width=pic.width, fig.height= pic.narrow }
+p.sat.u3 <- ggplot(d, aes(x= as.factor(u3),  group=kierunek)) + 
+  geom_bar(aes(y = ..prop.., fill = factor(..x..)), stat="count") +
+  geom_text(aes( label = scales::percent(..prop..),
+                 y= ..prop.. ), stat= "count", vjust = -.5) +
+  labs(y = "%", fill="Z", x='Z') +
+  facet_grid(~kierunek) +
+  theme(legend.position = "none") +
+  ggtitle("Pytanie 13: znajomość programów komputerowych (U3)") +
+  scale_x_discrete(breaks=useful.breaks, labels=useful.labels) +
+  scale_y_continuous(labels = scales::percent) +
+  coord_flip()
+
+p.sat.u3
+```
+
+
+```{r, fig.width=pic.width, fig.height= pic.narrow }
+p.sat.u4 <- ggplot(d, aes(x= as.factor(u4),  group=kierunek)) + 
+  geom_bar(aes(y = ..prop.., fill = factor(..x..)), stat="count") +
+  geom_text(aes( label = scales::percent(..prop..),
+                 y= ..prop.. ), stat= "count", vjust = -.5) +
+  labs(y = "%", fill="Z", x='Z') +
+  facet_grid(~kierunek) +
+  theme(legend.position = "none") +
+  ggtitle("Pytanie 14: umiejętności uzyskane poza programem studiów (U4)") +
+  scale_x_discrete(breaks=useful.breaks, labels=useful.labels) +
+  scale_y_continuous(labels = scales::percent) +
+  coord_flip()
+
+p.sat.u4
+```
+
+```{r, fig.width=pic.width, fig.height= pic.narrow }
+p.sat.u5 <- ggplot(d, aes(x= as.factor(u5),  group=kierunek)) + 
+  geom_bar(aes(y = ..prop.., fill = factor(..x..)), stat="count") +
+  geom_text(aes( label = scales::percent(..prop..),
+                 y= ..prop.. ), stat= "count", vjust = -.5) +
+  labs(y = "%", fill="Z", x='Z') +
+  facet_grid(~kierunek) +
+  theme(legend.position = "none") +
+  ggtitle("Pytanie 15: umiejętności interpersonalne (U5)") +
+  scale_x_discrete(breaks=useful.breaks, labels=useful.labels) +
+  scale_y_continuous(labels = scales::percent) +
+  coord_flip()
+
+p.sat.u5
+```
+
+```{r, fig.width=pic.width, fig.height= pic.narrow }
+p.sat.u6 <- ggplot(d, aes(x= as.factor(u6),  group=kierunek)) + 
+  geom_bar(aes(y = ..prop.., fill = factor(..x..)), stat="count") +
+  geom_text(aes( label = scales::percent(..prop..),
+                 y= ..prop.. ), stat= "count", vjust = -.5) +
+  labs(y = "%", fill="Z", x='Z') +
+  facet_grid(~kierunek) +
+  theme(legend.position = "none") +
+  ggtitle("Pytanie 16: umiejętności nabyte w związku z przynależnością (U6)") +
+  scale_x_discrete(breaks=useful.breaks, labels=useful.labels) +
+  scale_y_continuous(labels = scales::percent) +
+  coord_flip()
+
+p.sat.u6
+```
+
+Łączny ranking umiejętności ocenionych w pytaniach 11--16. Poszczególne
+umiejętności zestawiono wg odsetka odpowiedzi przydają/bardzo przydają.
+
+```{r}
+p.ranking.u <- d %>%
+  select (u1,  u2, u3,  u4,  u5, u6, kierunek) %>%
+  pivot_longer(cols = c(u1,  u2, u3,  u4,  u5, u6),
+               names_to = 'UU', values_to = 'UV') %>%
+  mutate(
+    UV =case_when(
+      UV == 'przydają' ~ 1, 
+      UV == 'bardzo przydają' ~ 1,
+      TRUE ~ 0)) %>%
+  group_by(kierunek, UU) %>%
+  ## suma jednynek do liczby wierszy x 100 (czyli %)
+  summarise( v = sum(UV, na.rm = T) / n() * 100) %>%
+  ggplot(aes(x= reorder(UU, v),  y=v)) + 
+  geom_bar(stat="identity", fill=default_red) +
+  labs(y = "%", fill="Z", x='Z') +
+  facet_grid(~kierunek) +
+  theme(legend.position = "none") +
+  ggtitle("Ranking przydatnych umiejętności", 
+          subtitle="Odsetek odpowiedzi przydają/bardzo przydają") +
+  ##scale_x_discrete(breaks=c(), labels=c()) +
+  #scale_y_continuous(labels = scales::percent) +
+  coord_flip()
+
+p.ranking.u
+```
+
+Zwraca uwagę niska pozycja U6/U2, tj. 
+**Znajomość języków obcych** oraz
+oraz **Umiejętności nabyte w związku z przynależnością do organizacji studenckich, koła naukowego, organizacji
+  pozarządowej, politycznej, sportowej, charytatywnej**
+
+
+
+## Ocena ogólna, szkoły podjętej decyzji co do studiowania oraz plany na przyszłość.
+
+Pytania 17--21 dotyczą oceny przydatności programu studiów, decyzji co
+słuszności wyboru kierunku oraz planów dotyczących ewentualnej dalszej edukacji.
+
+
+```{r, fig.width=pic.width, fig.height= pic.narrow }
+p.program <- ggplot(d, aes(x= as.factor(program.studiow),  group=kierunek)) + 
+  geom_bar(aes(y = ..prop.., fill = factor(..x..)), stat="count") +
+  geom_text(aes( label = scales::percent(..prop..),
+                 y= ..prop.. ), stat= "count", vjust = -.5) +
+  labs(y = "%", fill="Z", x='Z') +
+  facet_grid(~kierunek) +
+  theme(legend.position = "none") +
+  ggtitle("Pytanie 17: Czy program studiów przygotował do zawodu?") +
+  scale_x_discrete(breaks=agree.breaks, labels=agree.labels) +
+  scale_y_continuous(labels = scales::percent) +
+  coord_flip()
+
+p.program
+```
+
+```{r, fig.width=pic.width, fig.height= pic.narrow }
+# Procenty się nie sumują do 100
+#levels(d$zamiary.d.ksztalcenia)
+p.z.ksztalcenia <- d %>%
+  select (studia.mgr, studia.pdpl, studia.inne, inna.forma, nie.planuje, kierunek) %>%
+  pivot_longer(cols = c(studia.mgr, studia.pdpl, studia.inne, inna.forma, nie.planuje),
+               names_to = 'forma.dk', values_to = 'zamiar.dk') %>%
+  ######
+  group_by(kierunek, forma.dk) %>%
+  ## suma jednynek do liczby wierszy x 100 (czyli %)
+  summarise( v = sum(zamiar.dk, na.rm = T) / n() * 100) %>%
+  ggplot(aes(x= as.factor(forma.dk),  y=v)) + 
+  geom_bar(stat="identity", fill=default_red) +
+  labs(y = "%", fill="Z", x='Z') +
+  facet_grid(~kierunek) +
+  theme(legend.position = "none") +
+  ggtitle("Pytanie 18: Czy i gdzie zamierza się Pani/Pan dalej kształcić?") +
+  ##scale_x_discrete(breaks=c(), labels=c()) +
+  #scale_y_continuous(labels = scales::percent) +
+  coord_flip()
+
+p.z.ksztalcenia
+```
+
+```{r, fig.width=pic.width, fig.height= pic.narrow }
+p.z.ksztalcenia.x <- d %>%
+  select (ZZS,  WK, WKZP,  RZ,  SM, RO, OPP, kierunek) %>%
+  pivot_longer(cols = c(ZZS,  WK, WKZP,  RZ,  SM, RO, OPP),
+               names_to = 'forma.dk', values_to = 'zamiar.dk') %>%
+  ######
+group_by(kierunek, forma.dk) %>%
+  ## suma jednynek do liczby wierszy x 100 (czyli %)
+  summarise( v = sum(zamiar.dk, na.rm = T) / n() * 100) %>%
+  ggplot(aes(x= as.factor(forma.dk),  y=v)) + 
+  geom_bar(stat="identity", fill=default_red) +
+  labs(y = "%", fill="Z", x='Z') +
+  facet_grid(~kierunek) +
+  theme(legend.position = "none") +
+  ggtitle("Pytanie 19: motywy dalszego kształcenia") +
+  ##scale_x_discrete(breaks=c(), labels=c()) +
+  #scale_y_continuous(labels = scales::percent) +
+  coord_flip()
+
+p.z.ksztalcenia.x
+```
+
+```{r, fig.width=pic.width, fig.height= pic.narrow }
+p.oczekiwania <- ggplot(d, aes(x= as.factor(oczekiwania),  group=kierunek)) + 
+  geom_bar(aes(y = ..prop.., fill = factor(..x..)), stat="count") +
+  geom_text(aes( label = scales::percent(..prop..),
+                 y= ..prop.. ), stat= "count", vjust = -.5) +
+  labs(y = "%", fill="Z", x='Z') +
+  facet_grid(~kierunek) +
+  theme(legend.position = "none") +
+  ggtitle("Pytanie 20: czy studia spełniły oczekiwania?") +
+  scale_x_discrete(breaks=agree.breaks, labels=agree.labels) +
+  scale_y_continuous(labels = scales::percent) +
+  coord_flip()
+
+p.oczekiwania
+```
+
+```{r, fig.width=pic.width, fig.height= pic.narrow }
+p.j.raz <- ggplot(d, aes(x= as.factor(decyzja.jeszcze.raz), group=kierunek)) + 
+  geom_bar(aes(y = ..prop.., fill = factor(..x..)), stat="count") +
+  geom_text(aes( label = scales::percent(..prop..),
+                 y= ..prop.. ), stat= "count", vjust = -.5) +
+  labs(y = "%", fill="Z", x='Z') +
+  facet_grid(~kierunek) +
+  theme(legend.position = "none") +
+  ggtitle("Pytanie 21: Czy powtórna decyzja oznaczałaby wybór tego samego kierunku?") +
+  scale_x_discrete(breaks=agree.breaks, labels=agree.labels) +
+  scale_y_continuous(labels = scales::percent) +
+  coord_flip()
+
+p.j.raz
+```
+
+## Ankieta absolwenta
+
+Formularz ankiety dla absolwenta pracującego
+
+Ankieta asolwenta PSW. Prosimy opodanie informacji nt swojej kariery zawodowej
+oraz o ocenę szkoły.
+
+1. Płeć [] kobieta [] mężczyna
+
+2. Rok ukończenia studiów
+
+3. Tryb [] stacjonarne  [] niestacjonarne
+
+4. Wiek (lata) [] 18--24 [] 25--30 [] 31--36 [] 37--42 [] 43--48 [] 49--54 [] 55 i więcej
+
+5. Kierunek: []  Ekonomia [] Pielęgniarstwo  [] Pielęgniarstwo pomostowe []  Ratownictwo medyczne []Kosmetologia
+
+6. W jakim sektorze Pan/i pracuje: []  publiczny  [] prywatny
+
+7. W jakiej dziedzinie sektora gospodarki Pan/i obecnie pracuje:
+   [] przemysł   [] budownictwo   [] usługi   []edukacja   []zdrowie  []administracja inne []
+
+8. Typ zatrudnienia:
+   []Umowa o pracę   []Umowa zlecenie/dzieło  []Staż/praktyka []Bez umowy []Własna działalność
+   
+9. Czy jest Pan/i zadowolony z wykonywanej pracy []{\FPSxxx
+
+10. Czy jest Pan/i zadowolony z poziomu wynagrodzenia{\FPSxxx
+	
+11.  Czy umiejętności specjalistyczne nabyte na studiach przydają się  Panu/Pani w wykonywanej 
+     aktualnie pracy:
+     []całkowicie się nie przydają  [] nie przydają [] trudno powiedzieć []przydają [] bardzo przydają
+
+12.  Znajomość języków obcych przydaje się  Panu/Pani w wykonywanej aktualnie pracy:
+     []całkowicie się nie przydają  [] nie przydają [] trudno powiedzieć []przydają [] bardzo przydają
+
+13.
+Znajomość obsługi programów komputerowych
+przydają się  Panu/Pani w wykonywanej aktualnie pracy:
+
+
+[]całkowicie się nie przydają  [] nie przydają [] trudno powiedzieć []przydają [] bardzo przydają
+
+14.
+Umiejętności zawodowe uzyskane poza programem studiów (kursy/szkolenia)
+przydają się  Panu/Pani w wykonywanej aktualnie pracy:
+
+[]całkowicie się nie przydają  [] nie przydają [] trudno powiedzieć []przydają [] bardzo przydają
+
+15.
+Umiejętności interpersonalne
+przydają się  Panu/Pani w wykonywanej aktualnie pracy:
+
+[]całkowicie się nie przydają  [] nie przydają [] trudno powiedzieć []przydają [] bardzo przydają
+
+16.
+Umiejętności nabyte w związku z przynależnością do organizacji studenckich, koła naukowego, organizacji
+pozarządowej, politycznej, sportowej, charytatywnej, itp.
+przydają się  Panu/Pani w wykonywanej aktualnie pracy:
+
+[]całkowicie się nie przydają  [] nie przydają [] trudno powiedzieć []przydają [] bardzo przydają
+
+17. Czy program studiów w PSW pozwolił Panu/Pani osiągnąć niezbędną wiedzę,
+umiejętności i kompetencje społeczne do wykonywania zawodu:
+
+[]zdecydowanie nie  [] nie [] trudno powiedzieć []tak [] zdecydowanie tak
+
+
+18. Czy zamierza się Pan/i dalej kształcić lub czy już Pan/i się kształci? 
+   (można zaznaczyć więcej niż jedną odpowiedź):
+
+    [] tak, na studiach magisterskich
+    [] tak, na studiach podyplomowych/szkolenich
+    [] tak, na innych studiach wyższych (doktoranckie, MBA)
+    [] tak, w innej formie (jakiej?)
+    [] nie planuję
+
+19. Jakie są Pana/Pani motywy podjęcia dalszego kształcenia (można zaznaczyć więcej niż jedną odpowiedź)
+
+    [] zwiększenie szansy znalezienia pracy
+    [] wymagania kwalifikacyjne związane z wykonywaną pracą (zdobycie uprawnień)
+    [] wymagania kwalifikacyjne niezbędne do zmiany pracy
+    [] chęć rozwoju zawodowego
+    [] chęć poprawy statusu materialnego
+    [] zainteresowanie tematyką kształcenia (rozwój osobisty)
+    [] oddelegowanie przez pracodawcę
+    [] inne (jakie?)
+    
+20. Czy studia spełniły Pana/Pani oczekiwania?
+
+[]zdecydowanie nie  [] nie [] trudno powiedzieć []tak [] zdecydowanie tak
+
+21. Czy gdyby Pan/i jeszcze raz podejmował/a decyzję o wyborze studiów to
+     wybrałby/ałaby Pan/i ten sam kierunek?
+
+[]zdecydowanie nie  [] nie [] trudno powiedzieć []tak [] zdecydowanie tak
